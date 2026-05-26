@@ -37,26 +37,70 @@ Keep the normal script too:
 
 ## Add the Vite alias
 
-In the app's `vite.config.ts`, alias `@salesforce/sdk-data` only in mock mode:
+In the app's `vite.config.ts`, do not replace the whole file. Make these two small edits.
+
+### 1. Add `isMockMode`
+
+Find this line:
 
 ```ts
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-
-export default defineConfig(({ mode }) => ({
-  plugins: [react()],
-  resolve: {
-    alias:
-      mode === "mock"
-        ? {
-            "@salesforce/sdk-data": "salesforce-sdk-data-mock",
-          }
-        : {},
-  },
-}));
+export default defineConfig(({ mode }) => {
+  return {
 ```
 
-If the app already has aliases, merge the mock alias into the existing `resolve.alias` object.
+Change it to:
+
+```ts
+export default defineConfig(({ mode }) => {
+  const isMockMode = mode === "mock";
+
+  return {
+```
+
+### 2. Add the alias inside `resolve.alias`
+
+Find the existing `resolve.alias` block. It usually looks similar to this:
+
+```ts
+resolve: {
+  dedupe: ["react", "react-dom"],
+  alias: {
+    "@": path.resolve(__dirname, "./src"),
+    "@api": path.resolve(__dirname, "./src/api"),
+    "@components": path.resolve(__dirname, "./src/components"),
+  },
+},
+```
+
+Add the mock alias inside the existing `alias: { ... }` object:
+
+```ts
+resolve: {
+  dedupe: ["react", "react-dom"],
+  alias: {
+    "@": path.resolve(__dirname, "./src"),
+
+    ...(isMockMode
+      ? {
+          "@salesforce/sdk-data": "salesforce-sdk-data-mock",
+        }
+      : {}),
+
+    "@api": path.resolve(__dirname, "./src/api"),
+    "@components": path.resolve(__dirname, "./src/components"),
+  },
+},
+```
+
+The important rule is: keep all existing aliases, and only add this block:
+
+```ts
+...(isMockMode
+  ? {
+      "@salesforce/sdk-data": "salesforce-sdk-data-mock",
+    }
+  : {})
+```
 
 ## Run
 
