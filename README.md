@@ -1,3 +1,5 @@
+<img width="1024" height="1535" alt="Dreaminforce-Salesforce-sdk-data-mock" src="https://github.com/user-attachments/assets/9815cced-10c2-474d-9b6b-cc78202f8972" />
+
 # salesforce-sdk-data-mock
 
 Generic in-memory Vite mock for `@salesforce/sdk-data` Salesforce UI API GraphQL query patterns.
