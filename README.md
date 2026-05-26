@@ -226,3 +226,36 @@ Return `undefined` to let the generic mock engine handle the operation.
 ## Known limitations
 
 This is not a full Salesforce GraphQL server. It does not enforce org schema validation, field-level security, sharing, mutations, or exact Salesforce null ordering behavior.
+
+## Security check
+
+This package has a very small dependency tree:
+
+- production dependency: `graphql`
+- development dependency: `typescript`
+- optional peer dependency: `@salesforce/sdk-data`
+
+Security checks run on May 26, 2026:
+
+```bash
+npm audit --omit=dev
+npm audit
+npm pack --dry-run
+```
+
+Results:
+
+- `npm audit --omit=dev`: 0 vulnerabilities
+- `npm audit`: 0 vulnerabilities
+- OSV API check for `graphql@16.14.0` and `typescript@5.9.3`: 0 vulnerabilities returned
+- GitHub vulnerability alerts are enabled for this repository
+
+To rerun the checks later:
+
+```bash
+cd salesforce-sdk-data-mock
+npm install
+npm audit --omit=dev
+npm audit
+npm pack --dry-run
+```
