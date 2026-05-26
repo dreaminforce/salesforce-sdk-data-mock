@@ -1,0 +1,45 @@
+{
+  "name": "salesforce-sdk-data-mock",
+  "version": "0.1.0",
+  "description": "Generic in-memory Vite mock for @salesforce/sdk-data UI API GraphQL queries.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "salesforce",
+    "vite",
+    "mock",
+    "graphql",
+    "uiapi"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "graphql": "^16.11.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  },
+  "peerDependencies": {
+    "@salesforce/sdk-data": "*"
+  },
+  "peerDependenciesMeta": {
+    "@salesforce/sdk-data": {
+      "optional": true
+    }
+  }
+}
