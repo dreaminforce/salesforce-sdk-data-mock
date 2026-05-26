@@ -6,17 +6,11 @@ Use this when you want a Salesforce Multi-Framework React app to run locally wit
 
 ## Install from GitHub
 
-Replace `YOUR_GITHUB_USERNAME_OR_ORG` and `REPO_NAME` with the GitHub repo where this package is pushed:
-
 ```bash
-npm install -D github:YOUR_GITHUB_USERNAME_OR_ORG/REPO_NAME
+npm install -D github:dreaminforce/salesforce-sdk-data-mock
 ```
 
-Example:
-
-```bash
-npm install -D github:acme/salesforce-sdk-data-mock
-```
+GitHub repo: https://github.com/dreaminforce/salesforce-sdk-data-mock
 
 ## Add mock mode
 
