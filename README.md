@@ -8,6 +8,24 @@ Use this when you want a Salesforce Multi-Framework React app to run locally wit
 
 ## Install from GitHub
 
+Run these commands from the Vite app folder, not from a parent Salesforce project folder.
+
+For Salesforce UI Bundles, this usually means the folder that contains both `vite.config.ts` and the UI bundle `package.json`, for example:
+
+```txt
+force-app/main/default/uiBundles/<your-bundle-name>
+```
+
+If your Salesforce project has another `package.json` at the repository root, do not add this package or the `dev:mock` script there. Use the UI bundle's `package.json`.
+
+First install the app's normal dependencies:
+
+```bash
+npm install
+```
+
+Then install the mock package:
+
 ```bash
 npm install -D github:dreaminforce/salesforce-sdk-data-mock
 ```
@@ -16,7 +34,7 @@ GitHub repo: https://github.com/dreaminforce/salesforce-sdk-data-mock
 
 ## Add mock mode
 
-In the app's `package.json`, add:
+In the same app `package.json`, add:
 
 ```json
 {
@@ -25,6 +43,8 @@ In the app's `package.json`, add:
   }
 }
 ```
+
+If `npm run dev:mock` says `Missing script: "dev:mock"`, you are either in the wrong folder or the script was added to a different `package.json`.
 
 Keep the normal script too:
 
@@ -37,11 +57,19 @@ Keep the normal script too:
 }
 ```
 
-## Add the Vite alias
+## Add the Vite alias and mock data page
 
-In the app's `vite.config.ts`, do not replace the whole file. Make these two small edits.
+In the app's `vite.config.ts`, do not replace the whole file. Make these small edits.
 
-### 1. Add `isMockMode`
+### 1. Add the mock data plugin import
+
+At the top of the file, add:
+
+```ts
+import { salesforceMockDataPlugin } from "salesforce-sdk-data-mock/vite";
+```
+
+### 2. Add `isMockMode`
 
 Find this line:
 
@@ -59,7 +87,19 @@ export default defineConfig(({ mode }) => {
   return {
 ```
 
-### 2. Add the alias inside `resolve.alias`
+### 3. Add the plugin in mock mode
+
+Find the existing `plugins` array and add the mock plugin:
+
+```ts
+plugins: [
+  ...(isMockMode ? [salesforceMockDataPlugin()] : []),
+],
+```
+
+Keep any plugins already in the app. If the app does not have a `plugins` array yet, add one.
+
+### 4. Add the alias inside `resolve.alias`
 
 Find the existing `resolve.alias` block. It usually looks similar to this:
 
@@ -126,6 +166,44 @@ In mock mode, Vite swaps `@salesforce/sdk-data` to this package:
 
 ```bash
 npm run dev:mock
+```
+
+## Mock data editor
+
+When the Vite plugin is enabled, open:
+
+```txt
+http://localhost:<your-vite-port>/mock-data
+```
+
+The page lets you:
+
+- View mock objects in a table
+- Edit cells
+- Add rows
+- Add fields
+- Upload a CSV
+- Download a CSV
+- Reset an object back to the package defaults
+
+When you save, CSV files are written into the app:
+
+```txt
+mock-data/Account.csv
+mock-data/Contact.csv
+mock-data/Invoice__c.csv
+```
+
+The app code does not change. Existing GraphQL queries still call `createDataSDK().graphql(...)`.
+In mock mode, the package checks `mock-data/*.csv` first. If a CSV exists for an object, those rows are used. If no CSV exists, the built-in sample records are used.
+
+You can customize the folder or page path:
+
+```ts
+salesforceMockDataPlugin({
+  dataDir: "mock-data",
+  pagePath: "/mock-data",
+});
 ```
 
 ## Included fixtures

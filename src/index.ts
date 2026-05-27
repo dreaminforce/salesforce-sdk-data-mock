@@ -14,7 +14,8 @@ import {
 
 type Variables = Record<string, unknown>;
 type MockScalar = string | number | boolean | null;
-type MockRecord = Record<string, unknown>;
+export type SalesforceMockRecord = Record<string, unknown>;
+type MockRecord = SalesforceMockRecord;
 type MockGraphQLError = { message: string };
 type MockGraphQLResult<TData = unknown> = {
 	data?: TData;
@@ -48,6 +49,16 @@ const LOGICAL_KEYS = new Set(["and", "or", "not", "AND", "OR", "NOT"]);
 
 const graphqlOverrides: SalesforceMockGraphQLOverride[] = [];
 const fixtureOverrides: Record<string, MockRecord[]> = {};
+const CSV_FIXTURES_ENDPOINT = "/__salesforce_sdk_data_mock__/fixtures";
+const CSV_FIXTURES_CACHE_MS = 500;
+const CSV_FIXTURES_FAILURE_CACHE_MS = 5_000;
+let csvFixturesCache:
+	| {
+			fixtures: Record<string, MockRecord[]>;
+			loadedAt: number;
+			cacheMs: number;
+	  }
+	| undefined;
 
 function salesforceId(prefix: string, index: number): string {
 	return `${prefix}${String(index).padStart(15, "0")}`;
@@ -320,6 +331,10 @@ export function resetSalesforceMockObjectFixtures(objectName?: string): void {
 	}
 }
 
+export function getSalesforceMockDefaultFixtures(): Record<string, MockRecord[]> {
+	return cloneFixtureMap(baseFixtures);
+}
+
 export async function createDataSDK(): Promise<{
 	graphql: <TData = unknown, TVariables = Variables>(
 		query: string | DocumentNode,
@@ -346,7 +361,7 @@ async function executeGraphQL<TData>(
 				definition.kind === Kind.OPERATION_DEFINITION,
 		);
 		const operationName = operation?.name?.value;
-		const fixtures = getFixtureMap();
+		const fixtures = await getFixtureMap();
 		const context: SalesforceMockGraphQLContext = {
 			query,
 			document,
@@ -1045,11 +1060,83 @@ function getIdPrefix(objectName: string): string {
 	}
 }
 
-function getFixtureMap(): Record<string, MockRecord[]> {
+async function getFixtureMap(): Promise<Record<string, MockRecord[]>> {
+	const csvFixtures = await loadCsvFixtureMap();
 	return {
 		...baseFixtures,
+		...csvFixtures,
 		...fixtureOverrides,
 	};
+}
+
+async function loadCsvFixtureMap(): Promise<Record<string, MockRecord[]>> {
+	if (typeof fetch !== "function") {
+		return {};
+	}
+
+	const now = Date.now();
+	if (csvFixturesCache && now - csvFixturesCache.loadedAt < csvFixturesCache.cacheMs) {
+		return csvFixturesCache.fixtures;
+	}
+
+	try {
+		const response = await fetch(CSV_FIXTURES_ENDPOINT, {
+			cache: "no-store",
+			headers: {
+				Accept: "application/json",
+			},
+		});
+		const contentType = response.headers.get("content-type") ?? "";
+		if (!response.ok || !contentType.includes("application/json")) {
+			throw new Error("CSV fixture endpoint is unavailable.");
+		}
+
+		const payload = (await response.json()) as { fixtures?: unknown };
+		const fixtures = normalizeFixtureMap(payload.fixtures);
+		csvFixturesCache = {
+			fixtures,
+			loadedAt: now,
+			cacheMs: CSV_FIXTURES_CACHE_MS,
+		};
+		return fixtures;
+	} catch {
+		csvFixturesCache = {
+			fixtures: {},
+			loadedAt: now,
+			cacheMs: CSV_FIXTURES_FAILURE_CACHE_MS,
+		};
+		return {};
+	}
+}
+
+function normalizeFixtureMap(value: unknown): Record<string, MockRecord[]> {
+	if (!isRecord(value)) {
+		return {};
+	}
+
+	const fixtures: Record<string, MockRecord[]> = {};
+	for (const [objectName, records] of Object.entries(value)) {
+		if (!Array.isArray(records)) continue;
+		fixtures[objectName] = records.filter(isRecord).map((record) => ({ ...record }));
+	}
+	return fixtures;
+}
+
+function cloneFixtureMap(fixtures: Record<string, MockRecord[]>): Record<string, MockRecord[]> {
+	return Object.fromEntries(
+		Object.entries(fixtures).map(([objectName, records]) => [
+			objectName,
+			records.map((record) => structuredCloneFallback(record)),
+		]),
+	);
+}
+
+function structuredCloneFallback<T>(value: T): T {
+	if (typeof structuredClone === "function") {
+		return structuredClone(value);
+	}
+
+	return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function getArguments(args: readonly ArgumentNode[], variables: Variables): Variables {

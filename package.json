@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js"
     }
   },
   "files": [
@@ -32,13 +36,18 @@
     "graphql": "^16.11.0"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "typescript": "~5.9.3"
   },
   "peerDependencies": {
-    "@salesforce/sdk-data": "*"
+    "@salesforce/sdk-data": "*",
+    "vite": "*"
   },
   "peerDependenciesMeta": {
     "@salesforce/sdk-data": {
+      "optional": true
+    },
+    "vite": {
       "optional": true
     }
   }
