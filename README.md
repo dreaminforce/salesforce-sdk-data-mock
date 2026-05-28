@@ -2,51 +2,89 @@
 
 # salesforce-sdk-data-mock
 
-Generic in-memory Vite mock for `@salesforce/sdk-data` Salesforce UI API GraphQL query patterns.
+`salesforce-sdk-data-mock` is a Vite-only local mock for common Salesforce UI API GraphQL reads made through `@salesforce/sdk-data`.
 
-Use this when you want a Salesforce Multi-Framework React app to run locally without a live org for common `uiapi.query` reads.
+Use it when a Salesforce Multi-Framework React app needs to run locally without connecting to a live Salesforce org.
 
-## Install from GitHub
+Your application code keeps the normal Salesforce import:
+
+```ts
+import { createDataSDK, gql } from "@salesforce/sdk-data";
+```
+
+In normal mode, the app uses the real Salesforce SDK. In mock mode, Vite aliases `@salesforce/sdk-data` to this package.
+
+## How It Helps Salesforce Development
+
+Salesforce front-end work often depends on org data, permissions, sample records, and network access. This package removes that dependency for local UI development.
+
+It helps teams:
+
+- Run Salesforce UI Bundle apps locally without a live org
+- Build and test React UI states with stable sample data
+- Share predictable mock records across developers
+- Edit local data through a browser page instead of changing code
+- Keep production imports unchanged while using mocks only in Vite mock mode
+
+This package is not a Salesforce server replacement. It is intended for local development of UI API GraphQL read flows.
+
+## What Is Headless 360?
+
+Headless 360 is Salesforce's shift from a UI-first platform experience to a platform that can also be used through APIs, MCP tools, and CLI commands. Instead of every user or agent needing to work inside the standard Salesforce browser UI, Salesforce capabilities can be brought into custom apps, automation flows, AI-agent workflows, developer tools, and other external surfaces.
+
+In simple terms:
+
+- Salesforce remains the system of record
+- Business data, metadata, and platform capabilities are exposed through programmable interfaces
+- Developers can build custom experiences on top of Salesforce
+- AI agents and automation tools can act on Salesforce data without opening the Salesforce UI
+- Teams can deliver Salesforce-powered workflows in the places where users already work
+
+This helps Salesforce teams because the CRM data and business logic stay governed in Salesforce, while the user experience can be built for a specific channel, role, or workflow.
+
+## How This Package Fits Headless 360
+
+Headless 360 development still needs front-end screens, data-driven components, and local test data. During local development, connecting every UI state to a real Salesforce org can slow teams down.
+
+This package helps with the local UI-development part of that workflow. It mocks the `@salesforce/sdk-data` layer in Vite, so your React app can keep its real Salesforce data-access code while local development receives mock `uiapi.query` responses.
+
+Use this package when you want to:
+
+- Build Salesforce-powered UI screens outside the standard Salesforce UI
+- Develop record list, detail, and related-data views with local mock records
+- Test UI states without depending on org access, auth, permissions, or live data
+- Upload and edit local CSV data through `/mock-data`
+- Switch back to the real Salesforce SDK by running the normal Vite command
+
+The package does not replace Headless 360 APIs or Salesforce. It makes local development easier for apps that consume Salesforce data through `@salesforce/sdk-data`.
+
+## Installation
 
 Run these commands from the Vite app folder, not from a parent Salesforce project folder.
 
-For Salesforce UI Bundles, this usually means the folder that contains both `vite.config.ts` and the UI bundle `package.json`, for example:
+For Salesforce UI Bundles, this is usually:
 
 ```txt
 force-app/main/default/uiBundles/<your-bundle-name>
 ```
 
-If your Salesforce project has another `package.json` at the repository root, do not add this package or the `dev:mock` script there. Use the UI bundle's `package.json`.
+Use the folder that contains both:
 
-First install the app's normal dependencies:
+- `package.json`
+- `vite.config.ts`
+
+If your Salesforce project also has a root `package.json`, do not install this package there.
+
+Install the app dependencies, then install the mock package:
 
 ```bash
 npm install
-```
-
-Then install the mock package:
-
-```bash
 npm install -D github:dreaminforce/salesforce-sdk-data-mock
 ```
 
-GitHub repo: https://github.com/dreaminforce/salesforce-sdk-data-mock
+## Package Script
 
-## Add mock mode
-
-In the same app `package.json`, add:
-
-```json
-{
-  "scripts": {
-    "dev:mock": "vite --mode mock"
-  }
-}
-```
-
-If `npm run dev:mock` says `Missing script: "dev:mock"`, you are either in the wrong folder or the script was added to a different `package.json`.
-
-Keep the normal script too:
+Add a separate mock script to the app `package.json`:
 
 ```json
 {
@@ -57,136 +95,99 @@ Keep the normal script too:
 }
 ```
 
-## Add the Vite alias and mock data page
+Keep the existing `dev` script. The mock script is only for local mock mode.
 
-In the app's `vite.config.ts`, do not replace the whole file. Make these small edits.
+## Vite Configuration
 
-### 1. Add the mock data plugin import
+Update the app `vite.config.ts`. Do not replace the whole file; add the mock pieces to the existing config.
 
-At the top of the file, add:
+### Import the Plugin
 
 ```ts
 import { salesforceMockDataPlugin } from "salesforce-sdk-data-mock/vite";
 ```
 
-### 2. Add `isMockMode`
+### Detect Mock Mode
 
-Find this line:
-
-```ts
-export default defineConfig(({ mode }) => {
-  return {
-```
-
-Change it to:
+Inside `defineConfig`, add `isMockMode`:
 
 ```ts
 export default defineConfig(({ mode }) => {
   const isMockMode = mode === "mock";
 
   return {
+    // existing config
+  };
+});
 ```
 
-### 3. Add the plugin in mock mode
+### Enable the Mock Data Plugin
 
-Find the existing `plugins` array and add the mock plugin:
+Add the plugin only in mock mode:
 
 ```ts
 plugins: [
   ...(isMockMode ? [salesforceMockDataPlugin()] : []),
+  // keep existing plugins here
 ],
 ```
 
-Keep any plugins already in the app. If the app does not have a `plugins` array yet, add one.
+### Add the SDK Alias
 
-### 4. Add the alias inside `resolve.alias`
-
-Find the existing `resolve.alias` block. It usually looks similar to this:
+Add this block inside the existing `resolve.alias` object:
 
 ```ts
 resolve: {
-  dedupe: ["react", "react-dom"],
   alias: {
-    "@": path.resolve(__dirname, "./src"),
-    "@api": path.resolve(__dirname, "./src/api"),
-    "@components": path.resolve(__dirname, "./src/components"),
-  },
-},
-```
-
-Add the mock alias inside the existing `alias: { ... }` object:
-
-```ts
-resolve: {
-  dedupe: ["react", "react-dom"],
-  alias: {
-    "@": path.resolve(__dirname, "./src"),
-
     ...(isMockMode
       ? {
           "@salesforce/sdk-data": "salesforce-sdk-data-mock",
         }
       : {}),
 
-    "@api": path.resolve(__dirname, "./src/api"),
-    "@components": path.resolve(__dirname, "./src/components"),
+    // keep existing aliases here
   },
 },
 ```
 
-The important rule is: keep all existing aliases, and only add this block:
+The alias is what makes existing imports resolve to the mock package in `dev:mock`.
 
-```ts
-...(isMockMode
-  ? {
-      "@salesforce/sdk-data": "salesforce-sdk-data-mock",
-    }
-  : {})
-```
+## Running the App
 
-## Run
+Run with mock Salesforce data:
 
 ```bash
 npm run dev:mock
 ```
 
-Existing app code should keep importing from Salesforce normally:
-
-```ts
-import { createDataSDK, gql } from "@salesforce/sdk-data";
-```
-
-In normal mode, the real Salesforce SDK is used:
+Run with the real Salesforce SDK:
 
 ```bash
 npm run dev
 ```
 
-In mock mode, Vite swaps `@salesforce/sdk-data` to this package:
+## `/mock-data` Data Screen
 
-```bash
-npm run dev:mock
-```
-
-## Mock data editor
-
-When the Vite plugin is enabled, open:
+When the Vite plugin is enabled, the package adds a local data-management screen:
 
 ```txt
 http://localhost:<your-vite-port>/mock-data
 ```
 
-The page lets you:
+Use this screen to manage mock Salesforce records without editing source code. It shows each object in an editable datatable, so you can view and update the data your app receives from `@salesforce/sdk-data` in mock mode.
 
-- View mock objects in a table
-- Edit cells
+The `/mock-data` screen lets you:
+
+- View mock records in datatables
+- Update record values by editing table cells
 - Add rows
 - Add fields
-- Upload a CSV
-- Download a CSV
-- Reset an object back to the package defaults
+- Create a custom object
+- Upload CSV files to replace or seed object data
+- Download object data as CSV
+- Reset an object to the package defaults
 
-When you save, CSV files are written into the app:
+When you save changes or upload a CSV, files are written into the app:
 
 ```txt
 mock-data/Account.csv
@@ -194,21 +195,11 @@ mock-data/Contact.csv
 mock-data/Invoice__c.csv
 ```
 
-The app code does not change. Existing GraphQL queries still call `createDataSDK().graphql(...)`.
-In mock mode, the package checks `mock-data/*.csv` first. If a CSV exists for an object, those rows are used. If no CSV exists, the built-in sample records are used.
+In mock mode, CSV files take priority over the built-in sample records. If no CSV exists for an object, the built-in records are used.
 
-You can customize the folder or page path:
+## Built-in Data
 
-```ts
-salesforceMockDataPlugin({
-  dataDir: "mock-data",
-  pagePath: "/mock-data",
-});
-```
-
-## Included fixtures
-
-The mock includes sample records for:
+The package includes sample records for:
 
 - `Account`
 - `Contact`
@@ -220,7 +211,18 @@ The mock includes sample records for:
 
 Unknown custom objects ending in `__c` are generated dynamically.
 
-## Add or replace fixtures
+## Custom Data
+
+### Use a Different Data Folder or Editor Path
+
+```ts
+salesforceMockDataPlugin({
+  dataDir: "mock-data",
+  pagePath: "/mock-data",
+});
+```
+
+### Add Fixtures in Code
 
 Create a mock setup file in the app, for example `src/mockSetup.ts`:
 
@@ -237,53 +239,11 @@ setSalesforceMockObjectFixtures("Invoice__c", [
 ]);
 ```
 
-Import that setup file somewhere that only runs in mock mode.
+Import that setup file only when the app runs in mock mode.
 
-## Supported GraphQL behavior
+## Operation Overrides
 
-The mock supports common Salesforce UI API connection responses:
-
-- `data.uiapi.query.<ObjectName>.edges[].node`
-- `totalCount`
-- `pageInfo.hasNextPage`
-- `pageInfo.hasPreviousPage`
-- `pageInfo.startCursor`
-- `pageInfo.endCursor`
-
-It preserves requested fields where practical. `Id` is returned as a string. Normal fields are returned as `{ value, displayValue }` when the query asks for that shape.
-
-Supported `where` operators:
-
-- `eq`
-- `ne`
-- `like`
-- `in`
-- `nin`
-- `gt`
-- `gte`
-- `lt`
-- `lte`
-
-Supported boolean filters:
-
-- `and` / `AND`
-- `or` / `OR`
-- `not` / `NOT`
-
-Supported `orderBy`:
-
-- `ASC`
-- `DESC`
-- one or more fields
-
-Supported pagination:
-
-- `first`
-- `after` with local mock cursors
-
-## Operation overrides
-
-Use overrides only for special operations the generic engine cannot handle:
+Use an override only when the generic mock engine cannot handle a specific GraphQL operation:
 
 ```ts
 import { addSalesforceMockGraphQLOverride } from "@salesforce/sdk-data";
@@ -303,37 +263,77 @@ addSalesforceMockGraphQLOverride(({ operationName }) => {
 
 Return `undefined` to let the generic mock engine handle the operation.
 
-## Known limitations
+## Supported GraphQL Behavior
+
+The mock supports common Salesforce UI API query and aggregate responses:
+
+- `data.uiapi.query.<ObjectName>.edges[].node`
+- `data.uiapi.query.<ObjectName>.nodes[]`
+- `data.uiapi.query.<ObjectName>.totalCount`
+- `data.uiapi.query.<ObjectName>.pageInfo`
+- `data.uiapi.aggregate.<ObjectName>`
+
+Supported filters:
+
+- `eq`
+- `ne`
+- `like`
+- `in`
+- `nin`
+- `gt`
+- `gte`
+- `lt`
+- `lte`
+- `and` / `AND`
+- `or` / `OR`
+- `not` / `NOT`
+
+Supported sorting and pagination:
+
+- `orderBy` with `ASC` or `DESC`
+- `first`
+- `after` with local mock cursors
+
+Fields are returned in the requested GraphQL shape where practical. `Id` is returned as a string. Standard fields are returned as `{ value, displayValue }` when the query asks for that shape.
+
+## Troubleshooting
+
+### `Missing script: "dev:mock"`
+
+You are probably in the wrong folder, or the script was added to a different `package.json`. Run the command from the folder that contains the UI bundle `package.json`.
+
+### The app still calls the real Salesforce SDK
+
+Check that:
+
+- You started the app with `npm run dev:mock`
+- `const isMockMode = mode === "mock"` is inside `defineConfig`
+- The `@salesforce/sdk-data` alias is inside `resolve.alias`
+- Existing aliases were preserved
+
+### `/mock-data` does not open
+
+Check that:
+
+- `salesforceMockDataPlugin()` is included in the Vite `plugins` array
+- The app was started with `npm run dev:mock`
+- You are using the Vite port shown by Vite
+
+## Limitations
 
 This is not a full Salesforce GraphQL server. It does not enforce org schema validation, field-level security, sharing, mutations, or exact Salesforce null ordering behavior.
 
-## Security check
+## Maintenance Checks
 
-This package has a very small dependency tree:
+This package has a small dependency tree:
 
 - production dependency: `graphql`
 - development dependency: `typescript`
-- optional peer dependency: `@salesforce/sdk-data`
+- optional peer dependencies: `@salesforce/sdk-data`, `vite`
 
-Security checks run on May 26, 2026:
-
-```bash
-npm audit --omit=dev
-npm audit
-npm pack --dry-run
-```
-
-Results:
-
-- `npm audit --omit=dev`: 0 vulnerabilities
-- `npm audit`: 0 vulnerabilities
-- OSV API check for `graphql@16.14.0` and `typescript@5.9.3`: 0 vulnerabilities returned
-- GitHub vulnerability alerts are enabled for this repository
-
-To rerun the checks later:
+To rerun local checks:
 
 ```bash
-cd salesforce-sdk-data-mock
 npm install
 npm audit --omit=dev
 npm audit
