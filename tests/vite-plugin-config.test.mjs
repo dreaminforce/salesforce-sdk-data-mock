@@ -34,6 +34,7 @@ test("Vite preserves generated aliases and resolves only Data SDK imports to the
 				"@future-salesforce-alias": "/project/src/future",
 			},
 		},
+		optimizeDeps: { noDiscovery: true, include: [] },
 		server: { middlewareMode: true },
 	});
 
