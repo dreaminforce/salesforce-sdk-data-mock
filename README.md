@@ -2,17 +2,17 @@
 
 # salesforce-sdk-data-mock
 
-`salesforce-sdk-data-mock` is a Vite-only local mock for common Salesforce UI API GraphQL reads made through `@salesforce/sdk-data`.
+`salesforce-sdk-data-mock` is a Vite-only local mock for common Salesforce UI API GraphQL operations made through the GA `@salesforce/platform-sdk` Data SDK.
 
 Use it when a Salesforce Multi-Framework React app needs to run locally without connecting to a live Salesforce org.
 
 Your application code keeps the normal Salesforce import:
 
 ```ts
-import { createDataSDK, gql } from "@salesforce/sdk-data";
+import { createDataSDK, gql } from "@salesforce/platform-sdk/data";
 ```
 
-In normal mode, the app uses the real Salesforce SDK. In mock mode, Vite aliases `@salesforce/sdk-data` to this package.
+In normal mode, the app uses the real Salesforce SDK. In mock mode, Vite aliases the Data SDK imports to this package.
 
 ## How It Helps Salesforce Development
 
@@ -46,7 +46,7 @@ This helps Salesforce teams because the CRM data and business logic stay governe
 
 Headless 360 development still needs front-end screens, data-driven components, and local test data. During local development, connecting every UI state to a real Salesforce org can slow teams down.
 
-This package helps with the local UI-development part of that workflow. It mocks the `@salesforce/sdk-data` layer in Vite, so your React app can keep its real Salesforce data-access code while local development receives mock `uiapi.query` responses.
+This package helps with the local UI-development part of that workflow. It mocks the `@salesforce/platform-sdk` Data SDK layer in Vite, so your React app can keep its real Salesforce data-access code while local development receives mock `uiapi.query` responses.
 
 Use this package when you want to:
 
@@ -56,7 +56,47 @@ Use this package when you want to:
 - Upload and edit local CSV data through `/mock-data`
 - Switch back to the real Salesforce SDK by running the normal Vite command
 
-The package does not replace Headless 360 APIs or Salesforce. It makes local development easier for apps that consume Salesforce data through `@salesforce/sdk-data`.
+The package does not replace Headless 360 APIs or Salesforce. It makes local development easier for apps that consume Salesforce data through `@salesforce/platform-sdk/data`.
+
+## Migrating from the Beta Data SDK
+
+Salesforce Multi-Framework GA replaces the beta `@salesforce/sdk-data` package and generic `graphql()` method. Application code should now:
+
+- Import Data SDK functions from `@salesforce/platform-sdk/data`
+- Call `dataSdk.graphql?.query({ query, variables })` for reads
+- Call `dataSdk.graphql?.mutate({ mutation, variables })` for writes
+- Treat `result.data` as potentially undefined
+
+This mock implements that GA interface. The old beta `dataSdk.graphql(query, variables)` interface is no longer exposed.
+
+## Create a Salesforce GA React Project
+
+Use a current Salesforce CLI release that includes the React UI Bundle generator. Confirm the command is available:
+
+```bash
+sf template generate ui-bundle --help
+```
+
+For a new Salesforce DX project, run:
+
+```bash
+sf template generate project --name MySalesforceProject
+cd MySalesforceProject
+
+sf template generate ui-bundle \
+  --name MyReactApp \
+  --label "My React App" \
+  --template reactbasic \
+  --output-dir force-app/main/default/uiBundles
+```
+
+If you already have a Salesforce DX project, run only the `ui-bundle` command from its root. The generated React application is created at:
+
+```txt
+force-app/main/default/uiBundles/MyReactApp
+```
+
+The current `reactbasic` template requires Node.js 22 or later and already uses the GA `@salesforce/platform-sdk` `query()` and `mutate()` interfaces.
 
 ## Installation
 
@@ -127,30 +167,77 @@ Add the plugin only in mock mode:
 
 ```ts
 plugins: [
-  ...(isMockMode ? [salesforceMockDataPlugin()] : []),
   // keep existing plugins here
+  ...(isMockMode ? [salesforceMockDataPlugin()] : []),
 ],
 ```
 
 ### Add the SDK Alias
 
-Add this block inside the existing `resolve.alias` object:
+Add these exact-match entries to the existing `resolve.alias` array. The first supports the Data SDK subpath recommended in the Salesforce documentation; the second supports applications that import the Data SDK from the package root. Exact matching prevents the mock from intercepting other SDK modules such as `@salesforce/platform-sdk/chat`.
 
 ```ts
 resolve: {
-  alias: {
+  alias: [
     ...(isMockMode
-      ? {
-          "@salesforce/sdk-data": "salesforce-sdk-data-mock",
-        }
-      : {}),
+      ? [
+          {
+            find: /^@salesforce\/platform-sdk\/data$/,
+            replacement: "salesforce-sdk-data-mock",
+          },
+          {
+            find: /^@salesforce\/platform-sdk$/,
+            replacement: "salesforce-sdk-data-mock",
+          },
+        ]
+      : []),
 
-    // keep existing aliases here
-  },
+    // keep existing alias entries here
+  ],
 },
 ```
 
-The alias is what makes existing imports resolve to the mock package in `dev:mock`.
+The aliases make existing Salesforce Data SDK imports resolve to the mock package in `dev:mock` without affecting other Platform SDK subpaths.
+
+The generated `reactbasic` Vite configuration currently represents aliases as an object. Convert it to the array form above and preserve each generated alias as an entry such as:
+
+```ts
+{ find: "@", replacement: path.resolve(__dirname, "./src") }
+```
+
+The generated `src/api/graphqlClient.ts` imports `createDataSDK` from the package root. No source change is required because the configuration aliases both supported Data SDK import forms.
+
+## GA Data SDK Usage
+
+Your application uses the same interface in real and mock modes:
+
+```ts
+import { createDataSDK, gql } from "@salesforce/platform-sdk/data";
+
+const dataSdk = await createDataSDK();
+const result = await dataSdk.graphql?.query({
+  query: gql`
+    query Accounts {
+      uiapi {
+        query {
+          Account {
+            nodes {
+              Id
+              Name {
+                value
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+});
+
+const accounts = result?.data?.uiapi?.query?.Account?.nodes ?? [];
+```
+
+Mock query results also expose `subscribe(callback)` and `refresh()`. Calling `refresh()` reruns the operation against the latest local fixtures and notifies active subscribers.
 
 ## Running the App
 
@@ -166,6 +253,22 @@ Run with the real Salesforce SDK:
 npm run dev
 ```
 
+Before starting mock mode, verify that the generated project still builds and lints:
+
+```bash
+npm run build
+npm run lint
+npm run dev:mock
+```
+
+The generated Salesforce Vite plugin can print `No default org found` when no org is authenticated. In mock mode, this warning is expected and does not prevent the local app or `/mock-data` from working.
+
+To confirm the integration:
+
+1. Open the Vite URL and run a Data SDK query from the application.
+2. Confirm that the query returns the built-in mock records.
+3. Open `http://localhost:<your-vite-port>/mock-data` and confirm that the editable object tables load.
+
 ## `/mock-data` Data Screen
 
 When the Vite plugin is enabled, the package adds a local data-management screen:
@@ -174,7 +277,7 @@ When the Vite plugin is enabled, the package adds a local data-management screen
 http://localhost:<your-vite-port>/mock-data
 ```
 
-Use this screen to manage mock Salesforce records without editing source code. It shows each object in an editable datatable, so you can view and update the data your app receives from `@salesforce/sdk-data` in mock mode.
+Use this screen to manage mock Salesforce records without editing source code. It shows each object in an editable datatable, so you can view and update the data your app receives from the Salesforce Data SDK in mock mode.
 
 The `/mock-data` screen lets you:
 
@@ -227,7 +330,7 @@ salesforceMockDataPlugin({
 Create a mock setup file in the app, for example `src/mockSetup.ts`:
 
 ```ts
-import { setSalesforceMockObjectFixtures } from "@salesforce/sdk-data";
+import { setSalesforceMockObjectFixtures } from "salesforce-sdk-data-mock";
 
 setSalesforceMockObjectFixtures("Invoice__c", [
   {
@@ -246,9 +349,10 @@ Import that setup file only when the app runs in mock mode.
 Use an override only when the generic mock engine cannot handle a specific GraphQL operation:
 
 ```ts
-import { addSalesforceMockGraphQLOverride } from "@salesforce/sdk-data";
+import { addSalesforceMockGraphQLOverride } from "salesforce-sdk-data-mock";
 
-addSalesforceMockGraphQLOverride(({ operationName }) => {
+addSalesforceMockGraphQLOverride(({ operationType, operationName }) => {
+  if (operationType !== "query") return undefined;
   if (operationName !== "SpecialOperation") return undefined;
 
   return {
@@ -262,6 +366,26 @@ addSalesforceMockGraphQLOverride(({ operationName }) => {
 ```
 
 Return `undefined` to let the generic mock engine handle the operation.
+
+The same override mechanism handles mutations. Generic mutation execution is intentionally unsupported, so register an override for each mutation used by your local application:
+
+```ts
+addSalesforceMockGraphQLOverride(({ operationType, operationName, variables }) => {
+  if (operationType !== "mutation" || operationName !== "UpdateAccount") {
+    return undefined;
+  }
+
+  return {
+    data: {
+      uiapi: {
+        AccountUpdate: {
+          Record: { Id: variables.id },
+        },
+      },
+    },
+  };
+});
+```
 
 ## Supported GraphQL Behavior
 
@@ -308,7 +432,7 @@ Check that:
 
 - You started the app with `npm run dev:mock`
 - `const isMockMode = mode === "mock"` is inside `defineConfig`
-- The `@salesforce/sdk-data` alias is inside `resolve.alias`
+- The `@salesforce/platform-sdk/data` and `@salesforce/platform-sdk` aliases are inside `resolve.alias`
 - Existing aliases were preserved
 
 ### `/mock-data` does not open
@@ -321,7 +445,7 @@ Check that:
 
 ## Limitations
 
-This is not a full Salesforce GraphQL server. It does not enforce org schema validation, field-level security, sharing, mutations, or exact Salesforce null ordering behavior.
+This is not a full Salesforce GraphQL server. It does not enforce org schema validation, field-level security, sharing, generic mutation execution, or exact Salesforce null ordering behavior. Mutations can be mocked with operation overrides.
 
 ## Maintenance Checks
 
@@ -329,7 +453,8 @@ This package has a small dependency tree:
 
 - production dependency: `graphql`
 - development dependency: `typescript`
-- optional peer dependencies: `@salesforce/sdk-data`, `vite`
+- optional peer dependency: `@salesforce/platform-sdk` (`>=10.24.0 <12`)
+- optional peer dependency: `vite`
 
 To rerun local checks:
 

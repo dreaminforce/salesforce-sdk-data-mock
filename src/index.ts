@@ -16,15 +16,117 @@ type Variables = Record<string, unknown>;
 type MockScalar = string | number | boolean | null;
 export type SalesforceMockRecord = Record<string, unknown>;
 type MockRecord = SalesforceMockRecord;
-type MockGraphQLError = { message: string };
+
+export interface SDKOptions {
+	surface?: string;
+}
+
+export type StatusCallback = () => Promise<unknown> | void;
+
+export interface WebAppDataSDKOptions {
+	basePath?: string;
+	onStatus?: Partial<Record<number, StatusCallback>>;
+}
+
+export type MosaicDataSDKOptions = object;
+
+export interface DataSDKOptions extends SDKOptions {
+	webapp?: WebAppDataSDKOptions;
+	mosaic?: MosaicDataSDKOptions;
+}
+
+export interface GraphQLError {
+	message: string;
+	locations?: Array<{ line: number; column: number }>;
+	path?: string[];
+}
+
+export type GraphQLRawDocument = string;
+export type GraphQLRequestHeaders = HeadersInit;
+
+export interface GraphQLRequest<TVariables = Variables> {
+	query: string;
+	variables?: TVariables;
+	operationName?: string;
+	headers?: GraphQLRequestHeaders;
+}
+
+export interface GraphQLResponse<TData> {
+	data: TData;
+	errors?: GraphQLError[];
+}
+
+export type CacheControl = "no-cache" | "only-if-cached" | {
+	type: "max-age";
+	maxAge: number;
+};
+
+export interface QueryOptions<TVariables = Variables> {
+	query: GraphQLRawDocument;
+	variables?: TVariables;
+	operationName?: string;
+	cacheControl?: CacheControl;
+	headers?: GraphQLRequestHeaders;
+}
+
+export interface MutateOptions<TVariables = Variables> {
+	mutation: GraphQLRawDocument;
+	variables?: TVariables;
+	operationName?: string;
+	headers?: GraphQLRequestHeaders;
+}
+
+export interface QuerySnapshot<TData> {
+	data: TData | undefined;
+	errors?: GraphQLError[];
+}
+
+export type QuerySubscriber<TData> = (snapshot: QuerySnapshot<TData>) => void;
+export type Unsubscribe = () => void;
+
+export interface QueryResult<TData> extends QuerySnapshot<TData> {
+	subscribe(callback: QuerySubscriber<TData>): Unsubscribe;
+	refresh(): Promise<void>;
+}
+
+export interface MutationResult<TData> {
+	data: TData | undefined;
+	errors?: GraphQLError[];
+}
+
+export interface DataSDKGraphQL {
+	query<TData, TVariables = Variables>(
+		options: QueryOptions<TVariables>,
+	): Promise<QueryResult<TData>>;
+	mutate<TData, TVariables = Variables>(
+		options: MutateOptions<TVariables>,
+	): Promise<MutationResult<TData>>;
+}
+
+export interface DataSDK {
+	graphql?: DataSDKGraphQL;
+	fetch?: typeof fetch;
+}
+
+export type NodeOfConnection<T> = T extends {
+	edges?: Array<infer TEdge> | null;
+} | null
+	? TEdge extends { node?: infer TNode } | null
+		? TNode
+		: never
+	: never;
+
 type MockGraphQLResult<TData = unknown> = {
 	data?: TData;
-	errors?: MockGraphQLError[];
+	errors?: GraphQLError[];
 };
+
+export type SalesforceMockOperationType = "query" | "mutation";
 
 export type SalesforceMockGraphQLContext = {
 	query: string;
 	document: DocumentNode;
+	operationType: SalesforceMockOperationType;
 	operationName?: string;
 	variables: Variables;
 	fixtures: Record<string, MockRecord[]>;
@@ -289,10 +391,9 @@ const baseFixtures: Record<string, MockRecord[]> = {
 	],
 };
 
-export function gql(
-	strings: TemplateStringsArray | string,
-	...values: Array<string | number | boolean | null | undefined>
-): string {
+export function gql(strings: TemplateStringsArray, ...values: unknown[]): string;
+export function gql(strings: string): string;
+export function gql(strings: TemplateStringsArray | string, ...values: unknown[]): string {
 	if (typeof strings === "string") {
 		return strings;
 	}
@@ -335,36 +436,126 @@ export function getSalesforceMockDefaultFixtures(): Record<string, MockRecord[]>
 	return cloneFixtureMap(baseFixtures);
 }
 
-export async function createDataSDK(): Promise<{
-	graphql: <TData = unknown, TVariables = Variables>(
-		query: string | DocumentNode,
-		variables?: TVariables,
-	) => Promise<MockGraphQLResult<TData>>;
-}> {
-	return {
-		graphql: async <TData = unknown, TVariables = Variables>(
-			query: string | DocumentNode,
-			variables?: TVariables,
-		) => executeGraphQL<TData>(query, normalizeVariables(variables)),
+export async function createDataSDK(options?: DataSDKOptions): Promise<DataSDK> {
+	void options;
+
+	const graphql: DataSDKGraphQL = {
+		query: executeMockQuery,
+		mutate: executeMockMutation,
 	};
+
+	return {
+		graphql,
+	};
+}
+
+async function executeMockQuery<TData, TVariables = Variables>(
+	options: QueryOptions<TVariables>,
+): Promise<QueryResult<TData>> {
+	if (bypassesFixtureCache(options.cacheControl)) {
+		csvFixturesCache = undefined;
+	}
+
+	const initial = await executeGraphQL<TData>(
+		options.query,
+		normalizeVariables(options.variables),
+		"query",
+		options.operationName,
+	);
+	const subscribers = new Set<QuerySubscriber<TData>>();
+	const result: QueryResult<TData> = {
+		data: initial.data,
+		errors: initial.errors,
+		subscribe(callback) {
+			subscribers.add(callback);
+			return () => subscribers.delete(callback);
+		},
+		async refresh() {
+			csvFixturesCache = undefined;
+			const refreshed = await executeGraphQL<TData>(
+				options.query,
+				normalizeVariables(options.variables),
+				"query",
+				options.operationName,
+			);
+			result.data = refreshed.data;
+			if (refreshed.errors) {
+				result.errors = refreshed.errors;
+			} else {
+				delete result.errors;
+			}
+
+			const snapshot = { data: result.data, errors: result.errors };
+			for (const subscriber of subscribers) {
+				try {
+					subscriber(snapshot);
+				} catch {
+					// A subscriber must not prevent other subscribers from receiving a refresh.
+				}
+			}
+		},
+	};
+
+	return result;
+}
+
+async function executeMockMutation<TData, TVariables = Variables>(
+	options: MutateOptions<TVariables>,
+): Promise<MutationResult<TData>> {
+	const result = await executeGraphQL<TData>(
+		options.mutation,
+		normalizeVariables(options.variables),
+		"mutation",
+		options.operationName,
+	);
+	return { data: result.data, errors: result.errors };
 }
 
 async function executeGraphQL<TData>(
 	queryInput: string | DocumentNode,
 	variables: Variables,
+	expectedOperationType: SalesforceMockOperationType,
+	requestedOperationName?: string,
 ): Promise<MockGraphQLResult<TData>> {
 	try {
 		const query = typeof queryInput === "string" ? queryInput : print(queryInput);
 		const document = typeof queryInput === "string" ? parse(queryInput) : queryInput;
-		const operation = document.definitions.find(
+		const operations = document.definitions.filter(
 			(definition): definition is OperationDefinitionNode =>
 				definition.kind === Kind.OPERATION_DEFINITION,
 		);
+		const operation = requestedOperationName
+			? operations.find((definition) => definition.name?.value === requestedOperationName)
+			: operations.length === 1
+				? operations[0]
+				: undefined;
+
+		if (!operation) {
+			const message = requestedOperationName
+				? `Mock GraphQL could not find operation "${requestedOperationName}".`
+				: operations.length > 1
+					? "Mock GraphQL requires operationName when a document contains multiple operations."
+					: "Mock GraphQL expected an operation definition.";
+			return { data: undefined, errors: [{ message }] };
+		}
+
+		if (operation.operation !== expectedOperationType) {
+			return {
+				data: undefined,
+				errors: [
+					{
+						message: `Mock GraphQL ${expectedOperationType}() cannot execute a ${operation.operation} operation.`,
+					},
+				],
+			};
+		}
+
 		const operationName = operation?.name?.value;
 		const fixtures = await getFixtureMap();
 		const context: SalesforceMockGraphQLContext = {
 			query,
 			document,
+			operationType: expectedOperationType,
 			operationName,
 			variables,
 			fixtures,
@@ -377,13 +568,22 @@ async function executeGraphQL<TData>(
 			}
 		}
 
-		if (!operation) {
-			return { errors: [{ message: "Mock GraphQL expected an operation definition." }] };
+		if (expectedOperationType === "mutation") {
+			return {
+				data: undefined,
+				errors: [
+					{
+						message:
+							"Mock GraphQL mutations require an operation override. Register one with addSalesforceMockGraphQLOverride().",
+					},
+				],
+			};
 		}
 
 		return { data: executeUiApiOperation(operation, document, variables, fixtures) as TData };
 	} catch (error) {
 		return {
+			data: undefined,
 			errors: [
 				{
 					message: error instanceof Error ? error.message : "Mock GraphQL execution failed.",
@@ -391,6 +591,15 @@ async function executeGraphQL<TData>(
 			],
 		};
 	}
+}
+
+function bypassesFixtureCache(cacheControl: CacheControl | undefined): boolean {
+	return (
+		cacheControl === "no-cache" ||
+		(typeof cacheControl === "object" &&
+			cacheControl.type === "max-age" &&
+			cacheControl.maxAge === 0)
+	);
 }
 
 function executeUiApiOperation(
