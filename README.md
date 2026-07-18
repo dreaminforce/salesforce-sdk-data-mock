@@ -1,4 +1,4 @@
-<img width="1024" height="1535" alt="Dreaminforce-Salesforce-sdk-data-mock" src="https://github.com/user-attachments/assets/9815cced-10c2-474d-9b6b-cc78202f8972" />
+<img width="1024" height="1536" alt="ChatGPT Image Jul 18, 2026, 05_26_13 PM" src="https://github.com/user-attachments/assets/2d7a51e5-615c-4685-a8be-93f7c7536fce" />
 
 # salesforce-sdk-data-mock
 
