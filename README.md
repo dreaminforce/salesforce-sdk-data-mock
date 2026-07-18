@@ -2,9 +2,15 @@
 
 # salesforce-sdk-data-mock
 
+[![npm version](https://img.shields.io/npm/v/salesforce-sdk-data-mock.svg)](https://www.npmjs.com/package/salesforce-sdk-data-mock)
+[![npm downloads](https://img.shields.io/npm/dm/salesforce-sdk-data-mock.svg)](https://www.npmjs.com/package/salesforce-sdk-data-mock)
+[![license](https://img.shields.io/npm/l/salesforce-sdk-data-mock.svg)](LICENSE)
+
 `salesforce-sdk-data-mock` is a Vite-only local mock for common Salesforce UI API GraphQL operations made through the GA `@salesforce/platform-sdk` Data SDK.
 
 Use it when a Salesforce Multi-Framework React app needs to run locally without connecting to a live Salesforce org.
+
+The package is published on npm: [`salesforce-sdk-data-mock`](https://www.npmjs.com/package/salesforce-sdk-data-mock).
 
 Your application code keeps the normal Salesforce import:
 
@@ -145,6 +151,22 @@ From the UI Bundle app folder, install the React app dependencies and then the m
 npm install
 npm install -D salesforce-sdk-data-mock
 ```
+
+Confirm that npm installed the published package:
+
+```bash
+npm ls salesforce-sdk-data-mock
+```
+
+### Upgrade from the GitHub Dependency
+
+If the UI Bundle app previously installed this package directly from GitHub, replace that dependency with the latest npm release from the same UI Bundle app folder:
+
+```bash
+npm install -D salesforce-sdk-data-mock@latest
+```
+
+This updates both the UI Bundle app's `package.json` and `package-lock.json`. Do not run the command from the Salesforce DX project root.
 
 ## Update the UI Bundle `package.json`
 
