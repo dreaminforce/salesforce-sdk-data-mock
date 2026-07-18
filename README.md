@@ -98,33 +98,57 @@ force-app/main/default/uiBundles/MyReactApp
 
 The current `reactbasic` template requires Node.js 22 or later and already uses the GA `@salesforce/platform-sdk` `query()` and `mutate()` interfaces.
 
-## Installation
+### Understand the Two `package.json` Files
 
-Run these commands from the Vite app folder, not from a parent Salesforce project folder.
-
-For Salesforce UI Bundles, this is usually:
+The generated Salesforce project contains a root package and a separate React application package:
 
 ```txt
-force-app/main/default/uiBundles/<your-bundle-name>
+MySalesforceProject/                                  # Salesforce DX project root
+├── package.json                                      # Root tooling; do not add this mock here
+├── sfdx-project.json
+└── force-app/main/default/uiBundles/
+    └── MyReactApp/                                   # UI Bundle app folder
+        ├── package.json                              # Add the mock dependency and dev:mock here
+        ├── package-lock.json
+        ├── vite.config.ts                            # Add the plugin and SDK aliases here
+        └── src/
 ```
 
-Use the folder that contains both:
+In the instructions below:
 
-- `package.json`
-- `vite.config.ts`
+- **Salesforce DX project root** means `MySalesforceProject/`, the folder containing `sfdx-project.json`.
+- **UI Bundle app folder** means `MySalesforceProject/force-app/main/default/uiBundles/MyReactApp/`, the folder containing the React app's `package.json` and `vite.config.ts`.
+- Run `sf` project and deployment commands from the Salesforce DX project root.
+- Run every `npm` command in this guide from the UI Bundle app folder.
+- Edit only the UI Bundle app's `package.json`; leave the Salesforce DX root `package.json` unchanged.
 
-If your Salesforce project also has a root `package.json`, do not install this package there.
+## Installation
 
-Install the app dependencies, then install the mock package:
+First change from the Salesforce DX project root into the UI Bundle app folder:
+
+```bash
+cd force-app/main/default/uiBundles/MyReactApp
+```
+
+Confirm that you are in the correct folder before installing anything:
+
+```bash
+pwd
+ls package.json vite.config.ts
+```
+
+The displayed path must end in `uiBundles/MyReactApp`, and both files must exist. Do not run the following commands from `MySalesforceProject/`, even though that folder also contains a `package.json`.
+
+From the UI Bundle app folder, install the React app dependencies and then the mock package:
 
 ```bash
 npm install
 npm install -D github:dreaminforce/salesforce-sdk-data-mock
 ```
 
-## Package Script
+## Update the UI Bundle `package.json`
 
-Add a separate mock script to the app `package.json`:
+Open `force-app/main/default/uiBundles/MyReactApp/package.json`—not the root `MySalesforceProject/package.json`—and add a separate mock script:
 
 ```json
 {
@@ -137,9 +161,9 @@ Add a separate mock script to the app `package.json`:
 
 Keep the existing `dev` script. The mock script is only for local mock mode.
 
-## Vite Configuration
+## Update the UI Bundle Vite Configuration
 
-Update the app `vite.config.ts`. Do not replace the whole file; add the mock pieces to the existing config.
+Update `force-app/main/default/uiBundles/MyReactApp/vite.config.ts`. Do not replace the whole file; add the mock pieces to the existing config.
 
 ### Import the Plugin
 
@@ -241,6 +265,8 @@ Mock query results also expose `subscribe(callback)` and `refresh()`. Calling `r
 
 ## Running the App
 
+Run these commands from the UI Bundle app folder—the same folder containing `vite.config.ts`.
+
 Run with mock Salesforce data:
 
 ```bash
@@ -293,9 +319,9 @@ The `/mock-data` screen lets you:
 When you save changes or upload a CSV, files are written into the app:
 
 ```txt
-mock-data/Account.csv
-mock-data/Contact.csv
-mock-data/Invoice__c.csv
+force-app/main/default/uiBundles/MyReactApp/mock-data/Account.csv
+force-app/main/default/uiBundles/MyReactApp/mock-data/Contact.csv
+force-app/main/default/uiBundles/MyReactApp/mock-data/Invoice__c.csv
 ```
 
 In mock mode, CSV files take priority over the built-in sample records. If no CSV exists for an object, the built-in records are used.
@@ -424,7 +450,7 @@ Fields are returned in the requested GraphQL shape where practical. `Id` is retu
 
 ### `Missing script: "dev:mock"`
 
-You are probably in the wrong folder, or the script was added to a different `package.json`. Run the command from the folder that contains the UI bundle `package.json`.
+You are probably in the Salesforce DX project root, or the script was added to its `package.json`. Change into `force-app/main/default/uiBundles/MyReactApp` and confirm that its `package.json` contains `dev:mock`.
 
 ### The app still calls the real Salesforce SDK
 
