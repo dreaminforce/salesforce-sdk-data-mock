@@ -33,6 +33,17 @@
     "uiapi"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dreaminforce/salesforce-sdk-data-mock.git"
+  },
+  "homepage": "https://github.com/dreaminforce/salesforce-sdk-data-mock#readme",
+  "bugs": {
+    "url": "https://github.com/dreaminforce/salesforce-sdk-data-mock/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "graphql": "^16.11.0"
   },

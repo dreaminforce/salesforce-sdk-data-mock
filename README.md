@@ -143,7 +143,7 @@ From the UI Bundle app folder, install the React app dependencies and then the m
 
 ```bash
 npm install
-npm install -D github:dreaminforce/salesforce-sdk-data-mock
+npm install -D salesforce-sdk-data-mock
 ```
 
 ## Update the UI Bundle `package.json`
