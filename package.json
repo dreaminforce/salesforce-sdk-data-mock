@@ -1,6 +1,6 @@
 {
   "name": "salesforce-sdk-data-mock",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Generic in-memory Vite mock for @salesforce/platform-sdk Data SDK GraphQL operations.",
   "type": "module",
   "main": "./dist/index.js",
@@ -38,7 +38,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
   },
   "peerDependencies": {
     "@salesforce/platform-sdk": ">=10.24.0 <12",

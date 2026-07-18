@@ -1,5 +1,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
 	getSalesforceMockDefaultFixtures,
 	type SalesforceMockRecord,
@@ -34,6 +35,14 @@ type ViteLikeServer = {
 type ViteLikePlugin = {
 	name: string;
 	apply: "serve";
+	config(): {
+		resolve: {
+			alias: Array<{
+				find: RegExp;
+				replacement: string;
+			}>;
+		};
+	};
 	configureServer(server: ViteLikeServer): void;
 };
 
@@ -46,6 +55,7 @@ export type SalesforceMockDataPluginOptions = {
 const DEFAULT_DATA_DIR = "mock-data";
 const DEFAULT_PAGE_PATH = "/mock-data";
 const DEFAULT_API_BASE = "/__salesforce_sdk_data_mock__";
+const MOCK_PACKAGE_ENTRY = fileURLToPath(new URL("./index.js", import.meta.url));
 
 export function salesforceMockDataPlugin(
 	options: SalesforceMockDataPluginOptions = {},
@@ -56,6 +66,22 @@ export function salesforceMockDataPlugin(
 	return {
 		name: "salesforce-sdk-data-mock",
 		apply: "serve",
+		config() {
+			return {
+				resolve: {
+					alias: [
+						{
+							find: /^@salesforce\/platform-sdk\/data$/,
+							replacement: MOCK_PACKAGE_ENTRY,
+						},
+						{
+							find: /^@salesforce\/platform-sdk$/,
+							replacement: MOCK_PACKAGE_ENTRY,
+						},
+					],
+				},
+			};
+		},
 		configureServer(server) {
 			const dataDir = path.resolve(server.config.root, options.dataDir ?? DEFAULT_DATA_DIR);
 
