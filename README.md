@@ -196,12 +196,29 @@ plugins: [
 ],
 ```
 
-### Add the SDK Alias
+### Add the SDK Aliases and Convert Every Existing Alias
 
-Add these exact-match entries to the existing `resolve.alias` array. The first supports the Data SDK subpath recommended in the Salesforce documentation; the second supports applications that import the Data SDK from the package root. Exact matching prevents the mock from intercepting other SDK modules such as `@salesforce/platform-sdk/chat`.
+The generated `reactbasic` Vite configuration represents `resolve.alias` as an object. The mock uses regular expressions for exact SDK matching, so you must convert the **entire** `alias` value to Vite's array form.
+
+This means changing the outer `alias: { ... }` to `alias: [ ... ]` and converting **every existing generated alias** from this object form:
+
+```ts
+"@": path.resolve(__dirname, "./src")
+```
+
+to this array-entry form:
+
+```ts
+{ find: "@", replacement: path.resolve(__dirname, "./src") }
+```
+
+Do not spread the mock alias array inside the generated alias object. That creates numeric object properties that Vite does not recognize as aliases.
+
+Replace the complete generated `resolve` section with this working configuration:
 
 ```ts
 resolve: {
+  dedupe: ["react", "react-dom"],
   alias: [
     ...(isMockMode
       ? [
@@ -216,18 +233,22 @@ resolve: {
         ]
       : []),
 
-    // keep existing alias entries here
+    { find: "@", replacement: path.resolve(__dirname, "./src") },
+    { find: "@api", replacement: path.resolve(__dirname, "./src/api") },
+    {
+      find: "@components",
+      replacement: path.resolve(__dirname, "./src/components"),
+    },
+    { find: "@utils", replacement: path.resolve(__dirname, "./src/utils") },
+    { find: "@styles", replacement: path.resolve(__dirname, "./src/styles") },
+    { find: "@assets", replacement: path.resolve(__dirname, "./src/assets") },
   ],
 },
 ```
 
-The aliases make existing Salesforce Data SDK imports resolve to the mock package in `dev:mock` without affecting other Platform SDK subpaths.
+The first exact-match entry supports the Data SDK subpath recommended in the Salesforce documentation. The second supports generated applications that import the Data SDK from the package root. Exact matching prevents the mock from intercepting unrelated Platform SDK modules such as `@salesforce/platform-sdk/chat`.
 
-The generated `reactbasic` Vite configuration currently represents aliases as an object. Convert it to the array form above and preserve each generated alias as an entry such as:
-
-```ts
-{ find: "@", replacement: path.resolve(__dirname, "./src") }
-```
+These aliases make existing Salesforce Data SDK imports resolve to the mock package in `dev:mock` without affecting normal `npm run dev` behavior.
 
 The generated `src/api/graphqlClient.ts` imports `createDataSDK` from the package root. No source change is required because the configuration aliases both supported Data SDK import forms.
 
